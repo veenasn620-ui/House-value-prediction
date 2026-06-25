@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pkl
+*.joblib
+plots/
+model_comparison.csv
+.env
+.venv
