@@ -1,25 +1,15 @@
-import pickle
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-
-# -------------------------------------------------------
-# Load trained model
-# -------------------------------------------------------
-
-@st.cache_resource
-def load_model():
-    with open("house_price_model.pkl", "rb") as file:
-        model = pickle.load(file)
-    return model
-
-
-model = load_model()
+from sklearn.datasets import fetch_california_housing
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
 
 # -------------------------------------------------------
-# App title
+# Page setup
 # -------------------------------------------------------
 
 st.set_page_config(
@@ -29,13 +19,43 @@ st.set_page_config(
 )
 
 st.title("🏠 House Value Prediction App")
-st.write(
-    "This app predicts house value using a machine learning regression model."
-)
+st.write("Predict house values in different California areas using Machine Learning.")
 
-st.warning(
-    "This model is trained on the California Housing Dataset, so the locations are California-based."
-)
+
+# -------------------------------------------------------
+# Train model inside the app
+# -------------------------------------------------------
+
+@st.cache_resource
+def train_model():
+    housing = fetch_california_housing(as_frame=True)
+
+    data = housing.frame
+    data.rename(columns={"MedHouseVal": "Price"}, inplace=True)
+
+    X = data.drop("Price", axis=1)
+    y = data["Price"]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=42
+    )
+
+    model = GradientBoostingRegressor(random_state=42)
+    model.fit(X_train, y_train)
+
+    predictions = model.predict(X_test)
+
+    r2 = r2_score(y_test, predictions)
+    mae = mean_absolute_error(y_test, predictions)
+    rmse = np.sqrt(mean_squared_error(y_test, predictions))
+
+    return model, r2, mae, rmse
+
+
+model, r2, mae, rmse = train_model()
 
 
 # -------------------------------------------------------
@@ -57,17 +77,32 @@ area_coordinates = {
 
 
 # -------------------------------------------------------
-# User inputs
+# Sidebar model info
 # -------------------------------------------------------
 
-st.subheader("Enter House Details")
+st.sidebar.header("Model Performance")
+st.sidebar.write(f"R² Score: {r2:.4f}")
+st.sidebar.write(f"MAE: {mae:.4f}")
+st.sidebar.write(f"RMSE: {rmse:.4f}")
+
+st.sidebar.info(
+    "The model is trained automatically when the app starts. "
+    "No large .pkl file is needed."
+)
+
+
+# -------------------------------------------------------
+# User input form
+# -------------------------------------------------------
+
+st.subheader("Enter House / Area Details")
 
 area = st.selectbox(
     "Select Area",
     list(area_coordinates.keys())
 )
 
-median_income = st.number_input(
+median_income = st.slider(
     "Median Income in Area",
     min_value=0.5,
     max_value=15.0,
@@ -75,26 +110,26 @@ median_income = st.number_input(
     step=0.1
 )
 
-house_age = st.number_input(
+house_age = st.slider(
     "House Age",
     min_value=1,
-    max_value=100,
+    max_value=52,
     value=25,
     step=1
 )
 
-average_rooms = st.number_input(
+average_rooms = st.slider(
     "Average Number of Rooms",
     min_value=1.0,
-    max_value=20.0,
+    max_value=15.0,
     value=5.0,
     step=0.1
 )
 
-average_bedrooms = st.number_input(
+average_bedrooms = st.slider(
     "Average Number of Bedrooms",
     min_value=0.5,
-    max_value=10.0,
+    max_value=5.0,
     value=1.0,
     step=0.1
 )
@@ -107,10 +142,10 @@ population = st.number_input(
     step=100
 )
 
-average_occupancy = st.number_input(
+average_occupancy = st.slider(
     "Average Occupancy per Household",
     min_value=1.0,
-    max_value=20.0,
+    max_value=10.0,
     value=3.0,
     step=0.1
 )
@@ -141,20 +176,37 @@ if st.button("Predict House Value"):
 
     st.success(f"Estimated House Value in {area}: ${predicted_price:,.2f}")
 
-    st.write("### Input Summary")
+    st.write("### Input Data Used")
     st.dataframe(input_data)
 
 
 # -------------------------------------------------------
-# Extra information
+# Explanation section
 # -------------------------------------------------------
 
 st.markdown("---")
-st.write("### About this App")
+
+st.write("### About this Project")
+
 st.write(
     """
-    This project uses machine learning regression models to predict house values.
-    The final model was trained using features such as income, house age,
-    rooms, bedrooms, population, occupancy, latitude, and longitude.
+    This app uses a machine learning regression model to predict house values.
+    The model is trained on the California Housing Dataset.
+
+    Features used:
+    - Median income
+    - House age
+    - Average rooms
+    - Average bedrooms
+    - Population
+    - Average occupancy
+    - Latitude
+    - Longitude
     """
+)
+
+st.warning(
+    "Note: This app predicts prices for California-based areas only because "
+    "the training dataset is the California Housing Dataset."
+)
 )
